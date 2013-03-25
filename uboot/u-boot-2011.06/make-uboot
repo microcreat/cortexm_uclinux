@@ -1,0 +1,9 @@
+#!/bin/bash
+
+echo "make the u-boot....."
+
+make ARCH=arm CROSS_COMPILE=arm-none-eabi- distclean
+
+make ARCH=arm CROSS_COMPILE=arm-none-eabi- ea1788_config
+
+make ARCH=arm CROSS_COMPILE=arm-none-eabi- 
