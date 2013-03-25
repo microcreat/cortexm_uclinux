@@ -1,0 +1,9 @@
+#!/bin/bash
+
+echo "make the kernel....."
+
+make ARCH=arm CROSS_COMPILE=arm-none-eabi- distclean
+#make ARCH=arm CROSS_COMPILE=arm-none-eabi- ea-lpc1788_defconfig
+make ARCH=arm CROSS_COMPILE=arm-none-eabi- ea-lpc1788_initramfs_defconfig
+make ARCH=arm CROSS_COMPILE=arm-none-eabi- uImage 
+
