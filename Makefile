@@ -20,8 +20,8 @@ uboot_target := u-boot-lpc.hex
 kernel_target := uImage
 rootfs_target := 
 
-.PHONY: all prepare uboot kernel rootfs
-all: prepare uboot kernel rootfs
+.PHONY: all prepare uboot rootfs kernel 
+all: prepare uboot rootfs kernel 
 
 prepare:
 
@@ -80,20 +80,6 @@ uboot_clean:
 	make -C $(root_dir)/uboot/u-boot-2011.06/ ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) distclean
 	rm -rf $(target_out)/$(uboot_target)
 
-kernel:
-	cp -af $(filesystem_dir)/rootfs/initramfs-list-min $(root_dir)/kernel/linux-2.6.33/
-	sed -i "s:busybox_dir:${busybox_dir}:" $(root_dir)/kernel/linux-2.6.33/initramfs-list-min
-	cp $(root_dir)/uboot/u-boot-2011.06/tools/mkimage /bin/
-	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) ea-lpc1788_defconfig
-	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(CROSS_COMPILE) ea-lpc1788_initramfs_defconfig
-	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) uImage
-	rm -rf /bin/mkimage
-	cp -af $(root_dir)/kernel/linux-2.6.33/arch/arm/boot/$(kernel_target) $(target_out)
-
-kernel_clean:
-	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) distclean	
-	rm -rf $(target_out)/$(kernel_target)
-
 rootfs:
 	make -C $(busybox_dir) ARCH=arm CROSS_COMPILE=$(ROOTFS_CROSS_COMPILE) CFLAGS=$(ROOTFS_CFLAGS) distclean
 	#cp $(busybox_dir)/uclinux_config $(busybox_dir)/.config
@@ -104,8 +90,22 @@ rootfs:
 rootfs_clean:
 	make -C $(busybox_dir) ARCH=arm CROSS_COMPILE=arm-uclinuxeabi- CFLAGS=$(ROOTFS_CFLAGS) distclean
 
+kernel:
+	cp -af $(filesystem_dir)/rootfs/initramfs-list-min $(root_dir)/kernel/linux-2.6.33/
+	sed -i "s:busybox_dir:${busybox_dir}:" $(root_dir)/kernel/linux-2.6.33/initramfs-list-min
+	sudo cp $(root_dir)/uboot/u-boot-2011.06/tools/mkimage /bin/
+	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) ea-lpc1788_defconfig
+	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(CROSS_COMPILE) ea-lpc1788_initramfs_defconfig
+	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) uImage
+	sudo rm -rf /bin/mkimage
+	cp -af $(root_dir)/kernel/linux-2.6.33/arch/arm/boot/$(kernel_target) $(target_out)
+
+kernel_clean:
+	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) distclean	
+	rm -rf $(target_out)/$(kernel_target)
+
 .PHONY += clean
-clean: uboot_clean kernel_clean
+clean: uboot_clean kernel_clean rootfs_clean
 	rm -rf $(target_out)
 		
 .PHONY += help
