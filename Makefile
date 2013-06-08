@@ -11,6 +11,8 @@ UBOOT_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2011.03/bin
 KERNEL_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 ROOTFS_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 
+uboot_version := u-boot-2010.03
+
 filesystem_dir := filesystem
 busybox_version := busybox-1.17.0
 busybox_dir := $(root_dir)/$(filesystem_dir)/$(busybox_version)
@@ -30,6 +32,12 @@ UBOOT_CROSS_COMPILE := $(UBOOT_TOOL_DIR)/$(UBOOT_CROSS_NAME)-
 UBOOT_CC := $(UBOOT_CROSS_COMPILE)gcc
 # Check for the correct version of cross tool for uboot
 cross_tool_arch := $(shell $(UBOOT_CC) -v 2>&1 | head -n 10 | grep -n '^Target:*[^ ].*' | grep -n '$(UBOOT_CROSS_NAME)')
+
+ifeq ($(uboot_version),u-boot-2010.03) 
+uboot_config := ea-lpc1788_config
+else 
+uboot_config := ea1788_config
+endif 
 
 ifeq ($(strip $(cross_tool_arch)),)
 $(info **********************************)
@@ -72,12 +80,13 @@ $(info **********************************)
 endif
 
 uboot:
-	make -C $(root_dir)/uboot/u-boot-2011.06/ ARCH=arm CROSS_COMPILE=$(UBOOT_CROSS_COMPILE) ea1788_config
-	make -C $(root_dir)/uboot/u-boot-2011.06/ ARCH=arm CROSS_COMPILE=$(UBOOT_CROSS_COMPILE) 
-	cp -af $(root_dir)/uboot/u-boot-2011.06/$(uboot_target) $(target_out)
+	@echo $(uboot_version) $(uboot_config)
+	make -C $(root_dir)/uboot/$(uboot_version)/ ARCH=arm CROSS_COMPILE=$(UBOOT_CROSS_COMPILE) $(uboot_config)
+	make -C $(root_dir)/uboot/$(uboot_version)/ ARCH=arm CROSS_COMPILE=$(UBOOT_CROSS_COMPILE) 
+	cp -af $(root_dir)/uboot/$(uboot_version)/$(uboot_target) $(target_out)
 
 uboot_clean:
-	make -C $(root_dir)/uboot/u-boot-2011.06/ ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) distclean
+	make -C $(root_dir)/uboot/$(uboot_version)/ ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) distclean
 	rm -rf $(target_out)/$(uboot_target)
 
 rootfs:
