@@ -23,6 +23,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+//#define DEBUG 
+
 /*
  * Embed the calculated checksum into the U-Boot image
  * (needed for execution of images from LPC178x eNVM).
@@ -142,7 +144,7 @@
 /* lpc17xx     S29GL128N
     addr1 ===> addr0 */ 
 //#define CONFIG_CMD_NORFLASH	
-#define CONFIG_NORFLASH
+//#define CONFIG_NORFLASH
 #define CONFIG_NORFLASH_BANKS	        1
 #define CONFIG_ADDR0_OFF                1    
 #define CONFIG_S29GL128N                1  
@@ -295,8 +297,8 @@
  * Network setup
  */
 #define CONFIG_NETMASK		255.255.255.0
-#define CONFIG_IPADDR		192.168.1.101
-#define CONFIG_SERVERIP		192.168.1.200
+#define CONFIG_IPADDR		192.168.1.149
+#define CONFIG_SERVERIP		192.168.1.101
 #define CONFIG_GATEWAYIP	192.168.1.1
 #define CONFIG_ETHADDR		00:E0:0C:00:00:01
 

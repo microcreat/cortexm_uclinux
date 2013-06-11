@@ -425,6 +425,8 @@ static int lpc178x_phy_init(struct lpc178x_eth_dev *mac)
 	if (mac->phy_id != 0xFF)
 		goto ok;
 
+	printf("microcreat:%s\n", __func__);
+
 	/*
 	 * Probe (find) a PHY
 	 */
@@ -713,6 +715,8 @@ static int lpc178x_phy_read(struct lpc178x_eth_dev *mac, u16 reg, u16 *val)
 {
 	int rv;
 
+	//printf("microcreat:%s\n", __func__);
+
 	LPC178X_ETH->mcmd = LPC178X_ETH_MCMD_READ_MSK;
 	LPC178X_ETH->madr = (mac->phy_adr << LPC178X_ETH_MADR_PA_BITS) |
 		(reg << LPC178X_ETH_MADR_RA_BITS);
@@ -815,7 +819,7 @@ static void lpc178x_mac_address_set(struct lpc178x_eth_dev *mac)
  * Reset all MAC logic
  */
 static void lpc178x_mac_reset(void)
-{
+{	
 	LPC178X_ETH->mac1 =
 		LPC178X_ETH_MAC1_RST_TX_MSK |
 		LPC178X_ETH_MAC1_RST_MCSTX_MSK |
@@ -823,10 +827,16 @@ static void lpc178x_mac_reset(void)
 		LPC178X_ETH_MAC1_RST_MCSRX_MSK |
 		LPC178X_ETH_MAC1_RST_SIM_MSK |
 		LPC178X_ETH_MAC1_RST_SOFT_MSK;
+
+	printf("microcreat:%s 1:%x:%x\n", __func__, LPC178X_ETH->mac1, LPC178X_ETH->command);
+	
 	LPC178X_ETH->command =
 		LPC178X_ETH_COMMAND_REG_RST_MSK |
 		LPC178X_ETH_COMMAND_TX_RST_MSK |
-		LPC178X_ETH_COMMAND_RX_RST_MSK;
+		LPC178X_ETH_COMMAND_RX_RST_MSK |
+		LPC178X_ETH_COMMAND_PASS_RUNT_MSK;
+
+	printf("microcreat:%s 2:%x:%x\n", __func__, LPC178X_ETH->mac1, LPC178X_ETH->command);
 }
 
 /*
@@ -836,6 +846,7 @@ static int lpc178x_mac_hw_init(struct lpc178x_eth_dev *mac)
 {
 	static int phy_reset_done;
 	int rv;
+	unsigned int tout;
 
 	/*
 	 * Enable power on the Ethernet block
@@ -852,6 +863,9 @@ static int lpc178x_mac_hw_init(struct lpc178x_eth_dev *mac)
 	 */
 	lpc178x_mac_reset();
 
+	/* A short delay after reset. */
+    for (tout = 100; tout; tout--);
+
 	/*
 	 * Initial MAC initialization
 	 */
@@ -860,6 +874,8 @@ static int lpc178x_mac_hw_init(struct lpc178x_eth_dev *mac)
 		LPC178X_ETH_MAC2_CRC_EN_MSK |
 		LPC178X_ETH_MAC2_PAD_CRC_EN_MSK;
 	LPC178X_ETH->maxf = PKTSIZE_ALIGN;
+
+	printf("microcreat:%s:lpc178x_phy_init a\n", __func__);
 
 	/*
 	 * Maximum number of retries, 0x37 collision window, gap
@@ -871,16 +887,23 @@ static int lpc178x_mac_hw_init(struct lpc178x_eth_dev *mac)
 		(LPC178X_ENET_GAP2 << LPC178X_ETH_IPGR_GAP2_BITS) |
 		(LPC178X_ENET_GAP1 << LPC178X_ETH_IPGR_GAP1_BITS);
 
+	printf("microcreat:%s:a\n", __func__);
+
+
 #ifdef CONFIG_LPC178X_ENET_USE_PHY_RMII
 	/* RMII setup */
 	LPC178X_ETH->command =
 		LPC178X_ETH_COMMAND_PASS_RUNT_MSK |
 		LPC178X_ETH_COMMAND_RMII;
 	LPC178X_ETH->supp = 0; /* 10 Mbps */
+	printf("microcreat:%s:b\n", __func__);
 #else
 	/* MII setup */
 	LPC178X_ETH->command = LPC178X_ETH_COMMAND_PASS_RUNT_MSK;
+    printf("microcreat:%s:c\n", __func__);
 #endif
+
+    printf("microcreat:%s:lpc178x_phy_init a\n", __func__);
 
 	/*
 	 * Init PHY
@@ -920,6 +943,8 @@ static int lpc178x_eth_init(struct eth_device *dev, bd_t *bd)
 	rv = lpc178x_mac_hw_init(mac);
 	if (rv != 0)
 		goto out;
+
+	printf("microcreat:%s\n", __func__);
 
 	/*
 	 * Set MAC address

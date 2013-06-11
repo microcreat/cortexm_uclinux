@@ -317,7 +317,7 @@ int eth_init(bd_t *bis)
 		puts ("No ethernet found.\n");
 		return -1;
 	}
-
+	
 	/* Sync environment with network devices */
 	eth_number = 0;
 	dev = eth_devices;
@@ -334,6 +334,7 @@ int eth_init(bd_t *bis)
 	old_current = eth_current;
 	do {
 		debug("Trying %s\n", eth_current->name);
+		printf("microcreat:%s:%s\n",__func__, eth_current->name);
 
 		if (eth_current->init(eth_current,bis) >= 0) {
 			eth_current->state = ETH_STATE_ACTIVE;

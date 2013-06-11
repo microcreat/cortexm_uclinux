@@ -299,9 +299,11 @@ int lpc17xx_hw_init(void)
 	/* Set RMII management clock rate */
 	__raw_writel((7 << 2), MAC_MCFG);
 
+
 	/* Reset all MAC logic */
 	__raw_writel(0xCF00, MAC_MAC1);
 	__raw_writel(0x0038, MAC_COMMAND);
+	//__raw_writel(0x0078, MAC_COMMAND);
 	msDelay(10);
 
 	/* Initial MAC initialization */
@@ -327,7 +329,7 @@ int lpc17xx_hw_init(void)
 	if (lpc17xx_mii_write(MII_BMCR,
 		(BMCR_SPEED100 | BMCR_ANENABLE)) == 0)
 		return 0;
-
+	
 	mst = 1000;
         btemp = 1;
         while (mst > 0) {
@@ -341,15 +343,16 @@ int lpc17xx_hw_init(void)
                         msDelay(1);
                 }
         }
-
+		
         if (btemp) {
                 debug("ENET: auto-negotiation failed\n");
                 return 0;
         }
-
+ 
         /* Read PHY Status Register to determine Ethernet Configuration */
         tmp1 = 0;
-        lpc17xx_mii_read(DP83848_PHY_STATUS, &tmp1);
+        //lpc17xx_mii_read(DP83848_PHY_STATUS, &tmp1);
+        lpc17xx_mii_read(0x0001, &tmp1);
         duplex = (tmp1 & 0x0004) >> 2;
         speed = (tmp1 & 0x0002) >> 1;
 
@@ -391,7 +394,7 @@ int lpc17xx_hw_init(void)
 		lpc17xx_eth_deinit();
 		return 0;
 	}
-
+    	
 	/* Enable broadcast and matching address packets */
 	__raw_writel(0x22, MAC_RXFILTCTRL);
 

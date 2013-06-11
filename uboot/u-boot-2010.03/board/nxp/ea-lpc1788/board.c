@@ -27,6 +27,11 @@
 #include <netdev.h>
 
 #include <asm/arch/lpc178x_gpio.h>
+ 
+#include <asm/arch/lpc17_regs.h>
+#include <asm/arch/lpc17_clocks.h>
+
+#define msdelay(x) udelay(x * 1000)
 
 /*
  * SDRAM-specific configuration
@@ -277,6 +282,7 @@ static const struct lpc178x_gpio_pin_config ea_lpc1788_gpio[] = {
 	/*
 	 * GPIO configuration for UART
 	 */
+#if 0	 
 #if CONFIG_LPC178X_UART_PORT == 0
 	/* P0.2 (D) = UART0 TXD */
 	{{0,  2}, LPC178X_GPIO_CONFIG_D(1, LPC178X_NO_PULLUP, 0, 0, 0, 0)},
@@ -289,6 +295,7 @@ static const struct lpc178x_gpio_pin_config ea_lpc1788_gpio[] = {
 	{{0, 11}, LPC178X_GPIO_CONFIG_D(1, LPC178X_NO_PULLUP, 0, 0, 0, 0)},
 #else /* Neither UART0 nor UART2 */
 #error This configuration of GPIO pins supports only UART0 or UART2
+#endif
 #endif
 
 #ifdef CONFIG_NR_DRAM_BANKS
@@ -350,6 +357,7 @@ static const struct lpc178x_gpio_pin_config ea_lpc1788_gpio[] = {
 	/* P1.17 (D) = RMII MDIO */
 	{{1, 17}, LPC178X_GPIO_CONFIG_D(1, LPC178X_NO_PULLUP, 0, 0, 0, 0)},
 #endif /* CONFIG_LPC178X_ETH */
+
 #ifdef CONFIG_SYS_FLASH_CS
 	/*
 	 * GPIO configuration for Flash.
@@ -379,11 +387,13 @@ static void gpio_init(void)
 	 */
 	lpc178x_periph_enable(LPC178X_SCC_PCONP_PCGPIO_MSK, 1);
 
+	ea1788_setup_pins();
+
 	/*
 	 * Configure GPIO pins using the `ea_lpc1788_gpio[]` table
 	 */
 	lpc178x_gpio_config_table(ea_lpc1788_gpio, ARRAY_SIZE(ea_lpc1788_gpio));
-
+#if 0
 #ifdef CONFIG_NR_DRAM_BANKS
 	/*
 	 * Configure GPIO pins used for the External Memory Controller (EMC)
@@ -402,6 +412,7 @@ static void gpio_init(void)
 	dsc.port = 4;
 	for (dsc.pin = 0; dsc.pin <= LPC178X_EMC_ADDR_PINS; dsc.pin++)
 		lpc178x_gpio_config(&dsc, LPC178X_GPIO_EMC_REGVAL);
+#endif
 #endif
 }
 
@@ -422,12 +433,13 @@ int board_init(void)
 	 */
 	LPC178X_SCC->emcdlyctl =
 		(LPC178X_EMC_CMDDLY << LPC178X_SCC_EMCDLYCTL_CMDDLY_BITS) |
-		(LPC178X_EMC_FBCLKDLY << LPC178X_SCC_EMCDLYCTL_FBCLKDLY_BITS);
+		(LPC178X_EMC_FBCLKDLY << LPC178X_SCC_EMCDLYCTL_FBCLKDLY_BITS);	
 
 	/*
 	 * Enable EMC
 	 */
 	LPC178X_EMC->emcctrl = LPC178X_EMC_CTRL_EN_MSK;
+	
 	/*
 	 * Little-endian mode
 	 */
@@ -437,7 +449,7 @@ int board_init(void)
 	 * Enable GPIO pins
 	 */
 	gpio_init();
-
+	
 #ifdef CONFIG_SYS_FLASH_CS
 	/* Set timing for flash */
 	st = &LPC178X_EMC->st[CONFIG_SYS_FLASH_CS];
@@ -449,6 +461,7 @@ int board_init(void)
 	st->wr = CONFIG_SYS_FLASH_WR;
 	st->ta = CONFIG_SYS_FLASH_TA;
 #endif
+
 	return 0;
 }
 
@@ -481,7 +494,8 @@ int dram_init(void)
 {
 	volatile struct lpc178x_emc_dy_regs *dy;
 	u32 tmp32;
-
+	
+#if 0
 	dy = &LPC178X_EMC->dy[CONFIG_SYS_RAM_CS];
 
 	/*
@@ -552,6 +566,12 @@ int dram_init(void)
 	 */
 	dy->cfg = (LPC178X_EMC_AM << LPC178X_EMC_DYCFG_AM_BITS) |
 		LPC178X_EMC_DYCFG_B_MSK;
+#endif
+
+#if 1 
+    /* Enable clock for EMC */
+	//lpc17_clk_enable(LPC17_CLK_ADC, 1);	
+#endif
 
 	/*
 	 * Fill in global info with description of DRAM configuration

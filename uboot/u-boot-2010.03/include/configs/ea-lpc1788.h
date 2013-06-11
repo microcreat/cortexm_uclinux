@@ -31,6 +31,132 @@
  */
 #undef DEBUG
 
+/* u-boot-2011.06 */
+/*
+ * Copyright (C) 2011 by NXP Semiconductors
+ * All rights reserved.
+ *
+ * @Author: Kevin Wells
+ * @Descr: Board specific u-boot configuration for the EA1788 board
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+/*
+ * Embed the calculated checksum into the U-Boot image
+ * (needed for execution of images from LPC178x eNVM).
+*/
+#define CONFIG_LPC178X_FCG
+
+/*
+ * This should be setup to the board specific rate for the external oscillator
+ */
+#define CONFIG_LPC17_OSC_RATE		12000000
+
+/*
+ * SYSCLK setup. Set the CONFIG_LPC17_PLL0_USE_EXTOSC define to 1 to
+ * use the external oscillator for the SYSCLK rate. Otherwise, the internal
+ * oscillator is used as SYSCLK.
+ */
+#define CONFIG_LPC17_PLL0_USE_EXTOSC	1
+
+/*
+ * Set CONFIG_LPC17_PLL0_ENABLE to 1 to enable PLL0. If PLL0 is enabled,
+ * the values of CONFIG_LPC17_PLL0_M and CONFIG_LPC17_PLL0_P must also
+ * be setup to configure the PLL0 rate based on the selected input clock.
+ * See the LCP177x/lpc178x User's Manual for information on setting these
+ * values correctly. SYSCLK is used as the PLL0 input clock.
+ * 
+ * If CONFIG_LPC17_PLL0_USE_EXTOSC==1
+ *  PLL0_CLK_OUT = CONFIG_LPC17_PLL0_M * CONFIG_LPC17_OSC_RATE
+ * else
+ *  PLL0_CLK_OUT = CONFIG_LPC17_PLL0_M * 12000000 (internal oscillator)
+ * 
+ * PLL0_FCCO mist be between 156MHz and 320MHz
+ *  where PLL0_FFC0 = PLL0_CLK_OUT * 2 * CONFIG_LPC17_PLL0_P
+ * PLL0_CLK_OUT must be between 9.75MHz and 160MHz
+ */
+#define CONFIG_LPC17_PLL0_ENABLE	1
+#define CONFIG_LPC17_PLL0_M		9
+#define CONFIG_LPC17_PLL0_P		1
+
+/*
+ * Set CONFIG_LPC17_PLL1_ENABLE to 1 to enable PLL1. If PLL1 is enabled,
+ * the values of CONFIG_LPC17_PLL1_M and CONFIG_LPC17_PLL1_P must also
+ * be setup to configure the PLL1 rate based on the selected input clock.
+ * 
+ * PLL1_CLK_OUT = CONFIG_LPC17_PLL1_M * CONFIG_LPC17_OSC_RATE
+ * PLL1_FFC0 = PLL1_CLK_OUT * 2 * CONFIG_LPC17_PLL1_P
+ * 
+ * PLL1_FCCO mist be between 156MHz and 320MHz
+ * PLL1_CLK_OUT must be between 9.75MHz and 160MHz
+ *  48MHz for USB, or anything if routed to the CLKOUT pin
+ */
+#define CONFIG_LPC17_PLL1_ENABLE	1
+#define CONFIG_LPC17_PLL1_M		4
+#define CONFIG_LPC17_PLL1_P		2
+
+/*
+ * Set CONFIG_LPC17_PLL0_FOR_CPU to 1 to use the PLL0 out for the CPU divider
+ * clock. If not set, SYSCLK is used as the CPU divider clock. Select a value
+ * between 1 and 31 for the CONFIG_LPC17_CPU_DIV value. The CPU clock will be
+ * either the PLL0 clock or the SYSCLK divided by the divider.
+ */
+#define CONFIG_LPC17_PLL0_FOR_CPU	1
+#define CONFIG_LPC17_CPU_DIV		1
+
+/*
+ * If using USB, PLL1 is used for the USB clock and needs to be 48MHz. Set
+ * this value to the divider from the PLL1 clock rate to get 48MHz. If not
+ * using USB, set this to 0. Only dividers of 4 and 6 are supported, which
+ * map to PLL1 rates of 192MHz and 288MHz, respectively.
+ */
+#define CONFIG_LPC17_USB_DIV		4
+
+/*
+ * The EMC clock is at the CPU rate or 1/2 the CPU rate. Set this value to 1
+ * to use half the CPU clock for the EMC rate
+*/
+#define CONFIG_LPC17_EMC_HALFCPU	1
+
+/*
+ * Peripheral clock selector. This divider, between 1 and 31, is used to
+ * generate the clock to the peripherals. The rate is divided from the CPU
+ * clock.
+ */
+#define CONFIG_LPC17_PCLK_DIV		2
+
+/*
+ * Number of FLASH clocks for the FLASH accelerator, must be between 1 and
+ * 6. See the User's Manual for the correct setting based on your CPU clock
+ * rate.
+ */
+#define CONFIG_LPC17_FLASH_CLOCKS	6
+
+/*
+ * select the UART used on the board. Five UARTs are available labelled
+ * UART0 to UART4. Select 0 to 4 for the UART used for uboot.
+ */
+#define CONFIG_LPC17_UART_BOOT		0
+
+/*
+ * Linux machine type, reuse the 24xx machine ID
+ */
+#define CONFIG_LPC17XX_MACHID		MACH_TYPE_LPC1788
+/*  */
+
 /*
  * This is an ARM Cortex-M3 CPU core
  */
@@ -355,6 +481,7 @@
 #undef CONFIG_CMD_NFS
 #undef CONFIG_CMD_SOURCE
 #undef CONFIG_CMD_XIMG
+#define CONFIG_CMD_PING
 
 /*
  * To save memory disable long help
@@ -390,9 +517,9 @@
 	"flashaddr=80020000\0"					\
 	"flashboot=run addip;bootm ${flashaddr}\0"		\
 	"ethaddr=C0:B1:3C:88:88:84\0"				\
-	"ipaddr=172.17.4.206\0"					\
-	"serverip=172.17.0.1\0"					\
-	"image=lpc178x/uImage\0"				\
+	"ipaddr=192.168.1.103\0"					\
+	"serverip=192.168.1.100\0"					\
+	"image=uImage\0"				\
 	"netboot=tftp ${image};run addip;bootm\0"		\
 	"update=tftp ${image};"					\
 	"prot off ${flashaddr} +${filesize};"			\

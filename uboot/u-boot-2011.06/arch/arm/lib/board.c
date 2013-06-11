@@ -473,7 +473,7 @@ void board_init_r (gd_t *id, ulong dest_addr)
 
 #if !defined(CONFIG_SYS_NO_FLASH)
 #if defined(CONFIG_CHIP_FLASH)
-	puts ("CHIP Flash: ");
+	puts ("Chip Flash: ");
 
 	if ((flash_size = chip_flash_init ()) > 0) {
 # ifdef CONFIG_SYS_FLASH_CHECKSUM
