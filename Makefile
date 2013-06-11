@@ -11,7 +11,7 @@ UBOOT_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2011.03/bin
 KERNEL_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 ROOTFS_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 
-uboot_version := u-boot-2010.03
+uboot_version := u-boot-2011.06
 
 filesystem_dir := filesystem
 busybox_version := busybox-1.17.0
