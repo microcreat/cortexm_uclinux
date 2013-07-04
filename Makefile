@@ -11,14 +11,14 @@ UBOOT_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2011.03/bin
 KERNEL_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 ROOTFS_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 
-uboot_version := u-boot-2011.06
+#uboot_version := u-boot-2011.06
+uboot_version := u-boot-2010.03
 
 filesystem_dir := filesystem
 busybox_version := busybox-1.17.0
 busybox_dir := $(root_dir)/$(filesystem_dir)/$(busybox_version)
 
 target_out := $(root_dir)/out
-uboot_target := u-boot-lpc.hex
 kernel_target := uImage
 rootfs_target := 
 
@@ -35,7 +35,9 @@ cross_tool_arch := $(shell $(UBOOT_CC) -v 2>&1 | head -n 10 | grep -n '^Target:*
 
 ifeq ($(uboot_version),u-boot-2010.03) 
 uboot_config := ea-lpc1788_config
+uboot_target := u-boot-lpc.hex
 else 
+uboot_target := u-boot-lpc.hex
 uboot_config := ea1788_config
 endif 
 

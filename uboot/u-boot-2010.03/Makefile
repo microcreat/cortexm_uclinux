@@ -295,6 +295,11 @@ __LIBS := $(subst $(obj),,$(LIBS)) $(subst $(obj),,$(LIBBOARD))
 # Always append ALL so that arch config.mk's can add custom ones
 ALL += $(obj)u-boot.srec $(obj)u-boot.bin $(obj)System.map $(U_BOOT_NAND) $(U_BOOT_ONENAND)
 
+# LPC addition, could use a conditional
+ifeq ($(CONFIG_LPC178X_FCG),y)
+ALL += u-boot-lpc.hex u-boot.dis
+endif
+
 all:		$(ALL)
 
 ifeq ($(CONFIG_LPC178X_FCG),y)
@@ -319,6 +324,9 @@ $(obj)u-boot.bin:	$(obj)u-boot $(SPIFILIB_DEP)
 ifeq ($(CONFIG_LPC178X_FCG),y)
 		$(obj)tools/lpc178x_fcg $(obj)u-boot.bin $(obj)u-boot-lpc.bin
 		mv $(obj)u-boot-lpc.bin $(obj)u-boot.bin
+
+$(obj)u-boot-lpc.hex:	$(obj)u-boot.bin
+		$(OBJCOPY) ${OBJCFLAGS} -O ihex $< $@ -I binary
 endif
 ifeq ($(CONFIG_LPC18XX_BOOTHEADER),y)
 		$(obj)tools/lpc18xx_bootheader $(obj)u-boot.bin $(obj)u-boot-bootheader.bin
