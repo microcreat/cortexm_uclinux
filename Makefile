@@ -34,7 +34,7 @@ UBOOT_CC := $(UBOOT_CROSS_COMPILE)gcc
 cross_tool_arch := $(shell $(UBOOT_CC) -v 2>&1 | head -n 10 | grep -n '^Target:*[^ ].*' | grep -n '$(UBOOT_CROSS_NAME)')
 
 ifeq ($(uboot_version),u-boot-2010.03) 
-uboot_config := ea-lpc1788_config
+uboot_config := mic_lpc1788_s_config
 uboot_target := u-boot-lpc.hex
 else 
 uboot_target := u-boot-lpc.hex

@@ -3253,6 +3253,9 @@ twr-k70f120m_config : unconfig
 lpc-lnx-evb_config :  unconfig
 	@$(MKCONFIG) $(@:_config=) arm arm_cortexm3 lpc-lnx-evb emcraft lpc178x
 
+mic_lpc1788_s_config :  unconfig
+	@$(MKCONFIG) $(@:_config=) arm arm_cortexm3 mic_lpc1788_s emcraft lpc178x
+
 k61-som_config \
 k61-som-150_config \
 k70-som-150_config \
