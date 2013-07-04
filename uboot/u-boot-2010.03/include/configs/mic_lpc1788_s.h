@@ -141,6 +141,8 @@
  */
 #define CONFIG_LPC178X_PCLK_DIV		2
 
+#define CONFIG_SYS_LPC178X_SYSREF   (CONFIG_LPC178X_PLL0_M * CONFIG_LPC178X_EXTOSC_RATE)
+
 /*
  * Number of clock ticks in 1 sec
  */
@@ -198,46 +200,47 @@
 #define CONFIG_LPC178X_EMC_HALFCPU
 
 /*
- * Configuration of the external Flash memory
+ * Configure the SPI contoler device driver
+ * FIFO Size is 64K, but leave 5 bytes for cmd[] + addr[]
  */
-/* Define this to enable NOR FLash support */
-#define CONFIG_SYS_FLASH_CS		0
+#define CONFIG_LPC178x_SPI			1
+#define CONFIG_SPI_MAX_XF_LEN		65530
 
-#if defined(CONFIG_SYS_FLASH_CS)
-#define CONFIG_SYS_FLASH_CFG		0x81 /* 16 bit, Byte Lane enabled */
-#define CONFIG_SYS_FLASH_WE		0x2
-#define CONFIG_SYS_FLASH_OE		0x2
-#define CONFIG_SYS_FLASH_RD		0x1f
-#define CONFIG_SYS_FLASH_PAGE		0x1f
-#define CONFIG_SYS_FLASH_WR		0x1f
-#define CONFIG_SYS_FLASH_TA		0x1f
-
-#define CONFIG_SYS_FLASH_BANK1_BASE	0x80000000 /* hardwired for CS0 */
-
-#define CONFIG_SYS_FLASH_CFI
-#define CONFIG_FLASH_CFI_DRIVER
-#define CONFIG_SYS_FLASH_SIZE		(16 * 1024 * 1024)
-#define CONFIG_SYS_FLASH_CFI_WIDTH	FLASH_CFI_16BIT
-#define CONFIG_SYS_FLASH_BANKS_LIST	{ CONFIG_SYS_FLASH_BANK1_BASE }
-#define CONFIG_SYS_MAX_FLASH_BANKS	1
-#define CONFIG_SYS_MAX_FLASH_SECT	128
 
 /*
- * Store env in flash.
+ * Configure SPI Flash
  */
-#define CONFIG_ENV_IS_IN_FLASH
-#else
-/*
- * Store env in memory only, if no flash.
- */
-#define CONFIG_ENV_IS_NOWHERE
-#define CONFIG_SYS_NO_FLASH
-#endif
+#define CONFIG_SPI_FLASH		1
+#define CONFIG_SPI_FLASH_MACRONIX	1
+#define CONFIG_SYS_NO_FLASH         1
+#define CONFIG_SPI_FLASH_BUS		0
+#define CONFIG_SPI_FLASH_CS		0
+#define CONFIG_SPI_FLASH_MODE		3
+#define CONFIG_SPI_FLASH_SPEED		(CONFIG_SYS_LPC178X_SYSREF / 4)
+#define CONFIG_SF_DEFAULT_SPEED		CONFIG_SPI_FLASH_SPEED
+#define CONFIG_SF_DEFAULT_MODE		CONFIG_SPI_FLASH_MODE
 
-#define CONFIG_ENV_SIZE			(4 * 1024)
-#define CONFIG_ENV_ADDR			CONFIG_SYS_FLASH_BANK1_BASE
+/*
+ * U-boot environment configuration
+ */
+#define CONFIG_ENV_IS_IN_SPI_FLASH	1
+#define CONFIG_ENV_SECT_SIZE		0x1000
+#define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
+#define CONFIG_ENV_OFFSET		0x0
+#define CONFIG_ENV_SPI_BUS		CONFIG_SPI_FLASH_BUS
+#define CONFIG_ENV_SPI_CS		CONFIG_SPI_FLASH_CS
+#define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SPI_FLASH_SPEED
+#define CONFIG_ENV_SPI_MODE		CONFIG_SPI_FLASH_MODE
+
 #define CONFIG_INFERNO			1
 #define CONFIG_ENV_OVERWRITE		1
+
+/*
+ * Location of kernel image and Co in SPI.
+ * Linux MTD driver has no boot sectors support, so locate kernel
+ * with 64K alignment
+ */
+#define CONFIG_ENV_IMG_OFFSET		0x10000
 
 /*
  * Serial console configuration

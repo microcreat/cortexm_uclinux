@@ -83,6 +83,7 @@ endif
 
 uboot:
 	@echo $(uboot_version) $(uboot_config)
+	make -C $(root_dir)/uboot/$(uboot_version)/ ARCH=arm CROSS_COMPILE=$(UBOOT_CROSS_COMPILE) $(uboot_config) distclean
 	make -C $(root_dir)/uboot/$(uboot_version)/ ARCH=arm CROSS_COMPILE=$(UBOOT_CROSS_COMPILE) $(uboot_config)
 	make -C $(root_dir)/uboot/$(uboot_version)/ ARCH=arm CROSS_COMPILE=$(UBOOT_CROSS_COMPILE) 
 	cp -af $(root_dir)/uboot/$(uboot_version)/$(uboot_target) $(target_out)
