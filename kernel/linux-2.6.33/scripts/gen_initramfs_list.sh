@@ -219,7 +219,7 @@ input_file() {
 # Process 'ifarch' commands. These commands have the following format:
 #
 # ifarch <mcu> <str>, where:
-# - <mcu> specifies the processor architecture (eg. A2F, STM32, etc)
+# - <mcu> specifies the processor architecture (eg. A2F, etc)
 # - <str> is a normal file, dir, node, etc string.
 #
 # If an <mcu> in an 'ifarch' command is the same as the value of

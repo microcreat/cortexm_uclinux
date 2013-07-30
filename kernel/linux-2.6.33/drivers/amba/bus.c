@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <linux/amba/bus.h>
+#include <linux/err.h>
 
 #include <asm/irq.h>
 #include <asm/sizes.h>
@@ -193,38 +194,20 @@ static void amba_device_release(struct device *dev)
 }
 
 /**
- *	amba_device_register - register an AMBA device
- *	@dev: AMBA device to register
- *	@parent: parent memory resource
+ *	amba_device_add - add a previously allocated AMBA device structure
+ *	@dev: AMBA device allocated by amba_device_alloc
+ *	@parent: resource parent for this devices resources
  *
- *	Setup the AMBA device, reading the cell ID if present.
- *	Claim the resource, and register the AMBA device with
- *	the Linux device manager.
+ *	Claim the resource, and read the device cell ID if not already
+ *	initialized.  Register the AMBA device with the Linux device
+ *	manager.
  */
-int amba_device_register(struct amba_device *dev, struct resource *parent)
+int amba_device_add(struct amba_device *dev, struct resource *parent)
 {
 	u32 pid, cid;
 	u32 size;
 	void __iomem *tmp;
 	int i, ret;
-
-	device_initialize(&dev->dev);
-
-	/*
-	 * Copy from device_add
-	 */
-	if (dev->dev.init_name) {
-		dev_set_name(&dev->dev, "%s", dev->dev.init_name);
-		dev->dev.init_name = NULL;
-	}
-
-	dev->dev.release = amba_device_release;
-	dev->dev.bus = &amba_bustype;
-	dev->dev.dma_mask = &dev->dma_mask;
-	dev->res.name = dev_name(&dev->dev);
-
-	if (!dev->dev.coherent_dma_mask && dev->dma_mask)
-		dev_warn(&dev->dev, "coherent dma mask is unset\n");
 
 	ret = request_resource(parent, &dev->res);
 	if (ret)
@@ -278,6 +261,123 @@ int amba_device_register(struct amba_device *dev, struct resource *parent)
  err_out:
 	return ret;
 }
+EXPORT_SYMBOL_GPL(amba_device_add);
+
+static struct amba_device *
+amba_aphb_device_add(struct device *parent, const char *name,
+		     resource_size_t base, size_t size, int irq1, int irq2,
+		     void *pdata, unsigned int periphid, u64 dma_mask)
+{
+	struct amba_device *dev;
+	int ret;
+
+	dev = amba_device_alloc(name, base, size);
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	dev->dma_mask = dma_mask;
+	dev->dev.coherent_dma_mask = dma_mask;
+	dev->irq[0] = irq1;
+	dev->irq[1] = irq2;
+	dev->periphid = periphid;
+	dev->dev.platform_data = pdata;
+	dev->dev.parent = parent;
+
+	ret = amba_device_add(dev, &iomem_resource);
+	if (ret) {
+		amba_device_put(dev);
+		return ERR_PTR(ret);
+	}
+
+	return dev;
+}
+
+struct amba_device *
+amba_apb_device_add(struct device *parent, const char *name,
+		    resource_size_t base, size_t size, int irq1, int irq2,
+		    void *pdata, unsigned int periphid)
+{
+	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
+				    periphid, 0);
+}
+EXPORT_SYMBOL_GPL(amba_apb_device_add);
+
+struct amba_device *
+amba_ahb_device_add(struct device *parent, const char *name,
+		    resource_size_t base, size_t size, int irq1, int irq2,
+		    void *pdata, unsigned int periphid)
+{
+	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
+				    periphid, ~0ULL);
+}
+EXPORT_SYMBOL_GPL(amba_ahb_device_add);
+
+static void amba_device_initialize(struct amba_device *dev, const char *name)
+{
+	device_initialize(&dev->dev);
+	if (name)
+		dev_set_name(&dev->dev, "%s", name);
+	dev->dev.release = amba_device_release;
+	dev->dev.bus = &amba_bustype;
+	dev->dev.dma_mask = &dev->dma_mask;
+	dev->res.name = dev_name(&dev->dev);
+}
+
+/**
+ *	amba_device_alloc - allocate an AMBA device
+ *	@name: sysfs name of the AMBA device
+ *	@base: base of AMBA device
+ *	@size: size of AMBA device
+ *
+ *	Allocate and initialize an AMBA device structure.  Returns %NULL
+ *	on failure.
+ */
+struct amba_device *amba_device_alloc(const char *name, resource_size_t base,
+	size_t size)
+{
+	struct amba_device *dev;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (dev) {
+		amba_device_initialize(dev, name);
+		dev->res.start = base;
+		dev->res.end = base + size - 1;
+		dev->res.flags = IORESOURCE_MEM;
+	}
+
+	return dev;
+}
+EXPORT_SYMBOL_GPL(amba_device_alloc);
+
+/**
+ *	amba_device_register - register an AMBA device
+ *	@dev: AMBA device to register
+ *	@parent: parent memory resource
+ *
+ *	Setup the AMBA device, reading the cell ID if present.
+ *	Claim the resource, and register the AMBA device with
+ *	the Linux device manager.
+ */
+int amba_device_register(struct amba_device *dev, struct resource *parent)
+{
+	amba_device_initialize(dev, dev->dev.init_name);
+	dev->dev.init_name = NULL;
+
+	if (!dev->dev.coherent_dma_mask && dev->dma_mask)
+		dev_warn(&dev->dev, "coherent dma mask is unset\n");
+
+	return amba_device_add(dev, parent);
+}
+
+/**
+ *	amba_device_put - put an AMBA device
+ *	@dev: AMBA device to put
+ */
+void amba_device_put(struct amba_device *dev)
+{
+	put_device(&dev->dev);
+}
+EXPORT_SYMBOL_GPL(amba_device_put);
 
 /**
  *	amba_device_unregister - unregister an AMBA device

@@ -182,9 +182,6 @@
 /* Aeroflex Gaisler GRLIB APBUART */
 #define PORT_APBUART    90
 
-/* STM32 USART */
-#define PORT_STM32USART	91
-
 /* Freescale Kinetis UART */
 #define PORT_KINETIS	92
 

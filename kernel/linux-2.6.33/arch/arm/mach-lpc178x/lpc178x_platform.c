@@ -23,6 +23,8 @@
  */
 
 #include <linux/init.h>
+#include <linux/i2c.h>
+#include <sound/uda1380.h>
 
 #include <asm/mach-types.h>
 
@@ -42,6 +44,8 @@
 #include <mach/sdcard.h>
 #include <mach/i2c.h>
 #include <mach/fb.h>
+#include <mach/rtc.h>
+#include <mach/wdt.h>
 
 #if defined(CONFIG_GPIOLIB)
 #include <mach/i2c-gpio.h>
@@ -150,6 +154,30 @@ static void __init lpc178x_init_irq(void)
 	nvic_init();
 }
 
+#if defined(CONFIG_SND_LPC3XXX_SOC) || defined(CONFIG_SND_LPC3XXX_SOC_MODULE)
+/*
+ * Platform data for the UDA1380 audio codec.
+ *
+ * There are no GPIOs connected to codec power and reset pins on EA-LPC1788.
+ * Use PLL integrated in the codec for clocking.
+ */
+static struct uda1380_platform_data uda1380_info = {
+	.gpio_power	= -1,
+	.gpio_reset	= -1,
+	.dac_clk	= UDA1380_DAC_CLK_WSPLL,
+};
+
+/*
+ * UDA1380 registration info for the EA-LPC1788 board
+ */
+static struct i2c_board_info __initdata ealpc1788_i2c_board_info[] = {
+	{
+		I2C_BOARD_INFO("uda1380", 0x1A),
+		.platform_data = &uda1380_info,
+	},
+};
+#endif
+
 /*
  * LPC178x/7x platform initialization.
  */
@@ -172,7 +200,7 @@ static void __init lpc178x_init(void)
 	lpc178x_uart_init();
 #endif
 
-#if defined(CONFIG_LPC178X_MAC)
+#if defined(CONFIG_LPC178X_ETHER)
 	/*
 	 * Configure the LPC178x/7x MAC
 	 */
@@ -233,4 +261,25 @@ static void __init lpc178x_init(void)
 	if (lpc178x_platform_get() == PLATFORM_LPC178X_EA_LPC1788)
 		ea_lpc1788_pca9532_init();
 #endif /* CONFIG_LEDS_PCA9532 && CONFIG_LEDS_PCA9532_GPIO */
+
+#if defined(CONFIG_RTC_DRV_LPC178X)
+	/*
+	 * Initialize the on-chip real-time clock
+	 */
+	lpc178x_rtc_init();
+#endif /* CONFIG_RTC_DRV_LPC178x */
+
+#if defined(CONFIG_SND_LPC3XXX_SOC) || defined(CONFIG_SND_LPC3XXX_SOC_MODULE)
+	if (lpc178x_platform_get() == PLATFORM_LPC178X_EA_LPC1788) {
+		i2c_register_board_info(0, ealpc1788_i2c_board_info,
+			ARRAY_SIZE(ealpc1788_i2c_board_info));
+	}
+#endif /* CONFIG_SND_LPC3XXX_SOC || CONFIG_SND_LPC3XXX_SOC_MODULE */
+#if defined(CONFIG_LPC2K_WATCHDOG)
+	/*
+	 * Initialize the on-chip wdt
+	 */
+	lpc178x_wdt_init();
+#endif /* CONFIG_LPC178X_WATCHDOG */
+
 }

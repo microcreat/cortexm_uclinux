@@ -106,6 +106,15 @@ config A2F_ENVM
 
 	  To compile this driver as a module, choose M.
 
+config M2S_ENVM
+	tristate "Microsemi's SmartFusion2: support for eNVM"
+	depends on ARCH_M2S
+	help
+	  Add support for accessing the integrated eNVM of
+	  SmartFusion2 as a character device file.
+
+	  To compile this driver as a module, choose M.
+
 config BFIN_JTAG_COMM
 	tristate "Blackfin JTAG Communication"
 	depends on BLACKFIN
@@ -1113,6 +1122,15 @@ config DEVPORT
 	default y
 
 source "drivers/s390/char/Kconfig"
+
+config KINETIS_ADC
+	tristate "ADC driver for Freescale Kinetis MCUs"
+	depends on ARCH_KINETIS
+	default n
+	help
+	  ADC driver for Freescale Kinetis MCUs with a custom ioctl()-based
+	  interface. This driver is designed for synchronous one-shot
+	  measurements.
 
 endmenu
 

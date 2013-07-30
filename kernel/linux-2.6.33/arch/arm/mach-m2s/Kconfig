@@ -1,0 +1,102 @@
+if ARCH_M2S
+
+config MACH_M2S
+	bool
+	default y
+	select ARM_NVIC if CPU_V7M
+	help
+	  Include support for the Actel M2S (SmartFusion2) cSoC
+
+menu "M2S I/O interfaces"
+	depends on ARCH_M2S
+
+config M2S_CACHE
+	depends on ARCH_M2S 
+	bool "Enable SmartFusion2 cache"
+	default y
+	help
+	  Enable the SmartFusion2 on-chip cache
+
+config M2S_MSS_UART0
+	depends on ARCH_M2S && SERIAL_8250
+	bool "Enable MSS UART0 port"
+	default n
+	help
+	  Include support for the MSS UART0 port
+
+config M2S_MSS_UART1
+	depends on ARCH_M2S && SERIAL_8250
+	bool "Enable MSS UART1 port"
+	default y
+	help
+	  Include support for the MSS UART1 port
+
+config M2S_MSS_MAC
+	depends on ARCH_M2S && M2S_ETH
+	bool "Enable MSS MAC port"
+	default y
+	help
+	  Include support for the MSS MAC port
+
+config M2S_MSS_SPI0
+	depends on ARCH_M2S && SPI_M2S
+	bool "Enable MSS SPI0 port"
+	default y
+	help
+	  Include support for the MSS SPI0 port
+
+config M2S_MSS_SPI1
+	depends on ARCH_M2S && SPI_M2S
+	bool "Enable MSS SPI1 port"
+	default n
+	help
+	  Include support for the MSS SPI1 port
+
+
+config M2S_MSS_I2C0
+	depends on ARCH_M2S && I2C_A2F
+	bool "Enable MSS I2C0 port"
+	default y
+	help
+	  Include support for the MSS I2C0 port
+
+config M2S_MSS_I2C1
+	depends on ARCH_M2S && I2C_A2F
+	bool "Enable MSS I2C1 port"
+	default y
+	help
+	  Include support for the MSS I2C1 port
+
+config M2S_MSS_USB
+	depends on ARCH_M2S && USB_MUSB_SOC && M2S_MSS_GPIO
+	bool "Enable MSS USB OTG port"
+	default y
+	help
+	  Include support for the MSS USB OTG port
+
+config M2S_MSS_GPIO
+	depends on ARCH_M2S
+	select GPIOLIB
+	bool "Enable MSS GPIO"
+	default y
+	help
+	  Include support for the MSS GPIOs
+
+config M2S_FPGA_GPIO
+	depends on ARCH_M2S
+	select GPIOLIB
+	bool "Enable FPGA GPIO"
+	default n
+	help
+	  Include support for the FPGA GPIOs
+
+config M2S_FPGA_GPIO_ADDR
+	hex "Base address of SmartFusion2 Core GPIO block"
+	depends on M2S_FPGA_GPIO
+	default "0x30000000"
+	help
+	  Specify base address of SmartFusion2 Core GPIO block
+
+endmenu
+
+endif

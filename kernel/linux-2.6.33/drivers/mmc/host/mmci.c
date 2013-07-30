@@ -10,6 +10,11 @@
  * Emcraft Systems, <www.emcraft.com>
  * Alexander Potashev <aspotashev@emcraft.com>
  *
+ * Add DMA support for STM32F2
+ * (C) Copyright 2012
+ * Emcraft Systems, <www.emcraft.com>
+ * Alexander Potashev <aspotashev@emcraft.com>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -25,6 +30,7 @@
 #include <linux/highmem.h>
 #include <linux/log2.h>
 #include <linux/mmc/host.h>
+#include <linux/mmc/card.h>
 #include <linux/amba/bus.h>
 #include <linux/clk.h>
 #include <linux/scatterlist.h>
@@ -43,29 +49,38 @@
 #include <mach/dma.h>
 #endif /* CONFIG_LPC178X_SD_DMA */
 
+#ifdef CONFIG_STM32_SD_DMA
+#include <linux/dma-mapping.h>
+#include <mach/dmainit.h>
+#include <mach/dmac.h>
+#endif /* CONFIG_STM32_SD_DMA */
+
 #include "mmci.h"
 
 #define DRIVER_NAME "mmci-pl18x"
 
 static unsigned int fmax = 515633;
 
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 
 #define SD_FIFO(x)			(x + 0x80)
 
 #define DMA_BUFF_SIZE SZ_64K
 
-struct LPC178X_SDDRV_DATA {
-	struct dma_config dmacfgtx;
-	struct dma_config dmacfgrx;
+struct sddrv_dmac_data {
 	struct device *dev;
 	int lastch;
+
+#if defined(CONFIG_LPC178X_SD_DMA)
+	struct dma_config dmacfgtx;
+	struct dma_config dmacfgrx;
 	dma_addr_t dma_handle_tx;
 	void *dma_v_base;
 	int mapped;
 	int preallocated_tx_buf;
+#endif /* CONFIG_LPC178X_SD_DMA */
 };
-static struct LPC178X_SDDRV_DATA lpc178x_drvdat;
+static struct sddrv_dmac_data dmac_drvdat;
 
 #undef MCI_IRQENABLE
 #define MCI_IRQENABLE \
@@ -73,6 +88,9 @@ static struct LPC178X_SDDRV_DATA lpc178x_drvdat;
 	MCI_DATATIMEOUTMASK | MCI_TXUNDERRUNMASK | MCI_RXOVERRUNMASK| \
 	MCI_CMDRESPENDMASK | MCI_CMDSENTMASK | MCI_DATAENDMASK)
 
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
+
+#if defined(CONFIG_LPC178X_SD_DMA)
 static int mmc_dma_setup(struct mmci_platform_data *plat)
 {
 	u32 llptrrx, llptrtx;
@@ -92,42 +110,42 @@ static int mmc_dma_setup(struct mmci_platform_data *plat)
 
 	if (plat->dma_tx_size) {
 		/* Use pre-allocated memory for the DMA Tx buffer */
-		lpc178x_drvdat.dma_handle_tx = (dma_addr_t)plat->dma_tx_v_base;
-		lpc178x_drvdat.dma_v_base = plat->dma_tx_v_base;
-		lpc178x_drvdat.preallocated_tx_buf = 1;
+		dmac_drvdat.dma_handle_tx = (dma_addr_t)plat->dma_tx_v_base;
+		dmac_drvdat.dma_v_base = plat->dma_tx_v_base;
+		dmac_drvdat.preallocated_tx_buf = 1;
 	} else {
 		/* Allocate a chunk of memory for the DMA TX buffers */
-		lpc178x_drvdat.dma_v_base = dma_alloc_coherent(lpc178x_drvdat.dev,
-			DMA_BUFF_SIZE, &lpc178x_drvdat.dma_handle_tx, GFP_KERNEL);
-		lpc178x_drvdat.preallocated_tx_buf = 0;
+		dmac_drvdat.dma_v_base = dma_alloc_coherent(dmac_drvdat.dev,
+			DMA_BUFF_SIZE, &dmac_drvdat.dma_handle_tx, GFP_KERNEL);
+		dmac_drvdat.preallocated_tx_buf = 0;
 	}
 
-	if (lpc178x_drvdat.dma_v_base == NULL) {
-		dev_err(lpc178x_drvdat.dev, "error getting DMA region\n");
+	if (dmac_drvdat.dma_v_base == NULL) {
+		dev_err(dmac_drvdat.dev, "error getting DMA region\n");
 		ret = -ENOMEM;
 		goto dma_no_tx_buff;
 	}
-	dev_info(lpc178x_drvdat.dev, "DMA buffer: phy:%p, virt:%p\n",
-		(void *) lpc178x_drvdat.dma_handle_tx,
-		lpc178x_drvdat.dma_v_base);
+	dev_info(dmac_drvdat.dev, "DMA buffer: phy:%p, virt:%p\n",
+		(void *) dmac_drvdat.dma_handle_tx,
+		dmac_drvdat.dma_v_base);
 
 	/* Setup TX DMA channel */
-	lpc178x_drvdat.dmacfgtx.ch = DMA_CH_SDCARD_TX;
-	lpc178x_drvdat.dmacfgtx.tc_inten = 0;
-	lpc178x_drvdat.dmacfgtx.err_inten = 0;
-	lpc178x_drvdat.dmacfgtx.src_size = 4;
-	lpc178x_drvdat.dmacfgtx.src_inc = 1;
-	lpc178x_drvdat.dmacfgtx.src_bsize = DMAC_CHAN_SRC_BURST_8;
-	lpc178x_drvdat.dmacfgtx.src_prph = DMAC_SRC_PERIP(DMA_PERID_SDCARD);
-	lpc178x_drvdat.dmacfgtx.dst_size = 4;
-	lpc178x_drvdat.dmacfgtx.dst_inc = 0;
-	lpc178x_drvdat.dmacfgtx.dst_bsize = DMAC_CHAN_DEST_BURST_8;
-	lpc178x_drvdat.dmacfgtx.dst_prph = DMAC_DEST_PERIP(DMA_PERID_SDCARD);
-	lpc178x_drvdat.dmacfgtx.flowctrl = DMAC_CHAN_FLOW_P_M2P;
+	dmac_drvdat.dmacfgtx.ch = DMA_CH_SDCARD_TX;
+	dmac_drvdat.dmacfgtx.tc_inten = 0;
+	dmac_drvdat.dmacfgtx.err_inten = 0;
+	dmac_drvdat.dmacfgtx.src_size = 4;
+	dmac_drvdat.dmacfgtx.src_inc = 1;
+	dmac_drvdat.dmacfgtx.src_bsize = DMAC_CHAN_SRC_BURST_8;
+	dmac_drvdat.dmacfgtx.src_prph = DMAC_SRC_PERIP(DMA_PERID_SDCARD);
+	dmac_drvdat.dmacfgtx.dst_size = 4;
+	dmac_drvdat.dmacfgtx.dst_inc = 0;
+	dmac_drvdat.dmacfgtx.dst_bsize = DMAC_CHAN_DEST_BURST_8;
+	dmac_drvdat.dmacfgtx.dst_prph = DMAC_DEST_PERIP(DMA_PERID_SDCARD);
+	dmac_drvdat.dmacfgtx.flowctrl = DMAC_CHAN_FLOW_P_M2P;
 	if (lpc178x_dma_ch_get(
-		&lpc178x_drvdat.dmacfgtx, "dma_sd_tx", NULL, NULL) < 0)
+		&dmac_drvdat.dmacfgtx, "dma_sd_tx", NULL, NULL) < 0)
 	{
-		dev_err(lpc178x_drvdat.dev,
+		dev_err(dmac_drvdat.dev,
 			"Error setting up SD card TX DMA channel\n");
 		ret = -ENODEV;
 		goto dma_no_txch;
@@ -135,31 +153,31 @@ static int mmc_dma_setup(struct mmci_platform_data *plat)
 
 	/* Allocate a linked list for DMA support */
 	llptrtx = lpc178x_dma_alloc_llist(
-		lpc178x_drvdat.dmacfgtx.ch, NR_SG * 2);
+		dmac_drvdat.dmacfgtx.ch, NR_SG * 2);
 	if (llptrtx == 0) {
-		dev_err(lpc178x_drvdat.dev,
+		dev_err(dmac_drvdat.dev,
 			"Error allocating list buffer (MMC TX)\n");
 		ret = -ENOMEM;
 		goto dma_no_txlist;
 	}
 
 	/* Setup RX DMA channel */
-	lpc178x_drvdat.dmacfgrx.ch = DMA_CH_SDCARD_RX;
-	lpc178x_drvdat.dmacfgrx.tc_inten = 0;
-	lpc178x_drvdat.dmacfgrx.err_inten = 0;
-	lpc178x_drvdat.dmacfgrx.src_size = 4;
-	lpc178x_drvdat.dmacfgrx.src_inc = 0;
-	lpc178x_drvdat.dmacfgrx.src_bsize = DMAC_CHAN_SRC_BURST_8;
-	lpc178x_drvdat.dmacfgrx.src_prph = DMAC_SRC_PERIP(DMA_PERID_SDCARD);
-	lpc178x_drvdat.dmacfgrx.dst_size = 4;
-	lpc178x_drvdat.dmacfgrx.dst_inc = 1;
-	lpc178x_drvdat.dmacfgrx.dst_bsize = DMAC_CHAN_DEST_BURST_8;
-	lpc178x_drvdat.dmacfgrx.dst_prph = DMAC_DEST_PERIP(DMA_PERID_SDCARD);
-	lpc178x_drvdat.dmacfgrx.flowctrl = DMAC_CHAN_FLOW_D_P2M;
+	dmac_drvdat.dmacfgrx.ch = DMA_CH_SDCARD_RX;
+	dmac_drvdat.dmacfgrx.tc_inten = 0;
+	dmac_drvdat.dmacfgrx.err_inten = 0;
+	dmac_drvdat.dmacfgrx.src_size = 4;
+	dmac_drvdat.dmacfgrx.src_inc = 0;
+	dmac_drvdat.dmacfgrx.src_bsize = DMAC_CHAN_SRC_BURST_8;
+	dmac_drvdat.dmacfgrx.src_prph = DMAC_SRC_PERIP(DMA_PERID_SDCARD);
+	dmac_drvdat.dmacfgrx.dst_size = 4;
+	dmac_drvdat.dmacfgrx.dst_inc = 1;
+	dmac_drvdat.dmacfgrx.dst_bsize = DMAC_CHAN_DEST_BURST_8;
+	dmac_drvdat.dmacfgrx.dst_prph = DMAC_DEST_PERIP(DMA_PERID_SDCARD);
+	dmac_drvdat.dmacfgrx.flowctrl = DMAC_CHAN_FLOW_D_P2M;
 	if (lpc178x_dma_ch_get(
-		&lpc178x_drvdat.dmacfgrx, "dma_sd_rx", NULL, NULL) < 0)
+		&dmac_drvdat.dmacfgrx, "dma_sd_rx", NULL, NULL) < 0)
 	{
-		dev_err(lpc178x_drvdat.dev,
+		dev_err(dmac_drvdat.dev,
 			"Error setting up SD card RX DMA channel\n");
 		ret = -ENODEV;
 		goto dma_no_rxch;
@@ -167,9 +185,9 @@ static int mmc_dma_setup(struct mmci_platform_data *plat)
 
 	/* Allocate a linked list for DMA support */
 	llptrrx = lpc178x_dma_alloc_llist(
-		lpc178x_drvdat.dmacfgrx.ch, NR_SG * 2);
+		dmac_drvdat.dmacfgrx.ch, NR_SG * 2);
 	if (llptrrx == 0) {
-		dev_err(lpc178x_drvdat.dev,
+		dev_err(dmac_drvdat.dev,
 			"Error allocating list buffer (MMC RX)\n");
 		ret = -ENOMEM;
 		goto dma_no_rxlist;
@@ -178,18 +196,18 @@ static int mmc_dma_setup(struct mmci_platform_data *plat)
 	return 0;
 
 dma_no_rxlist:
-	lpc178x_dma_ch_put(lpc178x_drvdat.dmacfgrx.ch);
-	lpc178x_drvdat.dmacfgrx.ch = -1;
+	lpc178x_dma_ch_put(dmac_drvdat.dmacfgrx.ch);
+	dmac_drvdat.dmacfgrx.ch = -1;
 dma_no_rxch:
-	lpc178x_dma_dealloc_llist(lpc178x_drvdat.dmacfgtx.ch);
+	lpc178x_dma_dealloc_llist(dmac_drvdat.dmacfgtx.ch);
 dma_no_txlist:
-	lpc178x_dma_ch_put(lpc178x_drvdat.dmacfgtx.ch);
-	lpc178x_drvdat.dmacfgtx.ch = -1;
+	lpc178x_dma_ch_put(dmac_drvdat.dmacfgtx.ch);
+	dmac_drvdat.dmacfgtx.ch = -1;
 dma_no_txch:
-	if (!lpc178x_drvdat.preallocated_tx_buf) {
-		dma_free_coherent(lpc178x_drvdat.dev, DMA_BUFF_SIZE,
-			lpc178x_drvdat.dma_v_base,
-			lpc178x_drvdat.dma_handle_tx);
+	if (!dmac_drvdat.preallocated_tx_buf) {
+		dma_free_coherent(dmac_drvdat.dev, DMA_BUFF_SIZE,
+			dmac_drvdat.dma_v_base,
+			dmac_drvdat.dma_handle_tx);
 	}
 dma_no_tx_buff:
 	return ret;
@@ -197,16 +215,16 @@ dma_no_tx_buff:
 
 static void mmc_dma_dealloc(void)
 {
-	lpc178x_dma_dealloc_llist(lpc178x_drvdat.dmacfgrx.ch);
-	lpc178x_dma_ch_put(lpc178x_drvdat.dmacfgrx.ch);
-	lpc178x_drvdat.dmacfgrx.ch = -1;
-	lpc178x_dma_dealloc_llist(lpc178x_drvdat.dmacfgtx.ch);
-	lpc178x_dma_ch_put(lpc178x_drvdat.dmacfgtx.ch);
-	lpc178x_drvdat.dmacfgtx.ch = -1;
-	if (!lpc178x_drvdat.preallocated_tx_buf) {
-		dma_free_coherent(lpc178x_drvdat.dev, DMA_BUFF_SIZE,
-			lpc178x_drvdat.dma_v_base,
-			lpc178x_drvdat.dma_handle_tx);
+	lpc178x_dma_dealloc_llist(dmac_drvdat.dmacfgrx.ch);
+	lpc178x_dma_ch_put(dmac_drvdat.dmacfgrx.ch);
+	dmac_drvdat.dmacfgrx.ch = -1;
+	lpc178x_dma_dealloc_llist(dmac_drvdat.dmacfgtx.ch);
+	lpc178x_dma_ch_put(dmac_drvdat.dmacfgtx.ch);
+	dmac_drvdat.dmacfgtx.ch = -1;
+	if (!dmac_drvdat.preallocated_tx_buf) {
+		dma_free_coherent(dmac_drvdat.dev, DMA_BUFF_SIZE,
+			dmac_drvdat.dma_v_base,
+			dmac_drvdat.dma_handle_tx);
 	}
 }
 
@@ -241,7 +259,7 @@ static void mmc_dma_rx_start(struct mmci_host *host)
 			if (dmaxferlen > 15872)
 				dmaxferlen = 15872;
 
-			lpc178x_dma_queue_llist_entry(lpc178x_drvdat.lastch,
+			lpc178x_dma_queue_llist_entry(dmac_drvdat.lastch,
 				(void *) SD_FIFO((u32)host->base),
 				dmaaddr, dmaxferlen);
 
@@ -270,17 +288,17 @@ static void mmc_dma_tx_start(struct mmci_host *host)
 	len = reqdata->sg_len;
 
 	/* Only 1 segment and no need to copy? */
-	if (len == 1 && !lpc178x_drvdat.preallocated_tx_buf) {
+	if (len == 1 && !dmac_drvdat.preallocated_tx_buf) {
 		dma_len = dma_map_sg(mmc_dev(host->mmc), reqdata->sg,
 			reqdata->sg_len, DMA_TO_DEVICE);
 		if (dma_len == 0)
 			return;
 
 		dmaaddr = (void *) sg_dma_address(&sg[0]);
-		lpc178x_drvdat.mapped = 1;
+		dmac_drvdat.mapped = 1;
 	} else {
 		/* Move data to contiguous buffer first, then transfer it */
-		dst_buffer = (char *) lpc178x_drvdat.dma_v_base;
+		dst_buffer = (char *) dmac_drvdat.dma_v_base;
 		do
 		{
 			if (!sg_miter_next(sg_miter))
@@ -296,8 +314,8 @@ static void mmc_dma_tx_start(struct mmci_host *host)
 
 		sg_miter_stop(sg_miter);
 
-		lpc178x_drvdat.mapped = 0;
-		dmaaddr = (void *) lpc178x_drvdat.dma_handle_tx;
+		dmac_drvdat.mapped = 0;
+		dmaaddr = (void *) dmac_drvdat.dma_handle_tx;
 	}
 
 	lpc178x_dma_start_pflow_xfer(DMA_CH_SDCARD_TX, dmaaddr,
@@ -306,7 +324,195 @@ static void mmc_dma_tx_start(struct mmci_host *host)
 	local_irq_restore(flags);
 }
 
-#endif /* CONFIG_LPC178X_SD_DMA */
+#elif defined(CONFIG_STM32_SD_DMA)
+
+static int mmc_dma_setup(struct mmci_platform_data *plat)
+{
+	return stm32_dma_ch_get(STM32F2_DMACH_SDIO);
+}
+
+static void mmc_dma_dealloc(void)
+{
+	int rv;
+
+	rv = stm32_dma_ch_put(STM32F2_DMACH_SDIO);
+	if (rv < 0)
+		pr_err("%s: stm32_dma_ch_put() failed (%d)\n", __func__, rv);
+}
+
+/*
+ * Prepare and enable DMA Rx channel (on STM32)
+ */
+static void mmc_dma_rx_start(struct mmci_host *host)
+{
+	struct mmc_request *mrq = host->mrq;
+	struct mmc_data *reqdata = mrq->data;
+	int dma_len;
+	int rv;
+
+	/* Scatter/gather DMA is not supported */
+	BUG_ON(reqdata->sg_len > 1);
+
+	dma_len = dma_map_sg(
+		mmc_dev(host->mmc), reqdata->sg, reqdata->sg_len,
+		DMA_FROM_DEVICE);
+	if (dma_len == 0) {
+		dev_err(mmc_dev(host->mmc), "could not map DMA Rx buffer\n");
+		goto out;
+	}
+
+	/*
+	 * Direction: peripheral-to-memory
+	 * Flow controller: peripheral
+	 * Priority: very high (3)
+	 * Double buffer mode: disabled
+	 * Circular mode: disabled
+	 */
+	rv = stm32_dma_ch_init(STM32F2_DMACH_SDIO, 0, 1, 3, 0, 0);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Enable burst mode; set FIFO threshold to "full FIFO"
+	 */
+	rv = stm32_dma_ch_init_fifo(STM32F2_DMACH_SDIO, 1, 3);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Peripheral address: SDIO controller FIFO data register
+	 * Peripheral increment: disabled
+	 * Peripheral data size: 32-bit
+	 * Burst transfer configuration: incremental burst of 4 beats
+	 */
+	rv = stm32_dma_ch_set_periph(STM32F2_DMACH_SDIO,
+		SD_FIFO((u32)host->base), 0, 2, 1);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Memory address: DMA buffer address
+	 * Memory incremental: enabled
+	 * Memory data size: 32-bit
+	 * Burst transfer configuration: incremental burst of 4 beats
+	 */
+	rv = stm32_dma_ch_set_memory(STM32F2_DMACH_SDIO,
+		sg_dma_address(&reqdata->sg[0]), 1, 2, 1);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Set number of items to transfer to zero, because we use peripheral
+	 * flow controller, and therefore the SDIO controller will stop
+	 * the transfer when the whole block data has been transferred.
+	 */
+	rv = stm32_dma_ch_set_nitems(STM32F2_DMACH_SDIO, 0);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Enable the DMA channel. After this point, the DMA transfer will
+	 * be able to start.
+	 */
+	rv = stm32_dma_ch_enable(STM32F2_DMACH_SDIO);
+	if (rv < 0)
+		goto err;
+
+	goto out;
+
+err:
+	dev_err(mmc_dev(host->mmc), "Rx DMA channel initialization failed\n");
+out:
+	;
+}
+
+/*
+ * Prepare and enable DMA Tx channel (on STM32)
+ */
+static void mmc_dma_tx_start(struct mmci_host *host)
+{
+	struct mmc_request *mrq = host->mrq;
+	struct mmc_data *reqdata = mrq->data;
+	int dma_len;
+	int rv;
+
+	/* Scatter/gather DMA is not supported */
+	BUG_ON(reqdata->sg_len > 1);
+
+	dma_len = dma_map_sg(
+		mmc_dev(host->mmc), reqdata->sg, reqdata->sg_len,
+		DMA_TO_DEVICE);
+	if (dma_len == 0) {
+		dev_err(mmc_dev(host->mmc), "could not map DMA Tx buffer\n");
+		goto out;
+	}
+
+	/*
+	 * Direction: memory-to-peripheral
+	 * Flow controller: peripheral
+	 * Priority: very high (3)
+	 * Double buffer mode: disabled
+	 * Circular mode: disabled
+	 */
+	rv = stm32_dma_ch_init(STM32F2_DMACH_SDIO, 1, 1, 3, 0, 0);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Enable burst mode; set FIFO threshold to "full FIFO"
+	 */
+	rv = stm32_dma_ch_init_fifo(STM32F2_DMACH_SDIO, 1, 3);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Peripheral address: SDIO controller FIFO data register
+	 * Peripheral increment: disabled
+	 * Peripheral data size: 32-bit
+	 * Burst transfer configuration: incremental burst of 4 beats
+	 */
+	rv = stm32_dma_ch_set_periph(STM32F2_DMACH_SDIO,
+		SD_FIFO((u32)host->base), 0, 2, 1);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Memory address: DMA buffer address
+	 * Memory incremental: enabled
+	 * Memory data size: 32-bit
+	 * Burst transfer configuration: incremental burst of 4 beats
+	 */
+	rv = stm32_dma_ch_set_memory(STM32F2_DMACH_SDIO,
+		sg_dma_address(&reqdata->sg[0]), 1, 2, 1);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Set number of items to transfer to zero, because we use peripheral
+	 * flow controller, and therefore the SDIO controller will stop
+	 * the transfer when the whole block data has been transferred.
+	 */
+	rv = stm32_dma_ch_set_nitems(STM32F2_DMACH_SDIO, 0);
+	if (rv < 0)
+		goto err;
+
+	/*
+	 * Enable the DMA channel. After this point, the DMA transfer will
+	 * be able to start.
+	 */
+	rv = stm32_dma_ch_enable(STM32F2_DMACH_SDIO);
+	if (rv < 0)
+		goto err;
+
+	goto out;
+
+err:
+	dev_err(mmc_dev(host->mmc), "Tx DMA channel initialization failed\n");
+out:
+	;
+}
+
+#endif /* CONFIG_LPC178X_SD_DMA; CONFIG_STM32_SD_DMA */
 
 /**
  * struct variant_data - MMCI variant-specific quirks
@@ -317,6 +523,9 @@ static void mmc_dma_tx_start(struct mmci_host *host)
  *	      is asserted (likewise for RX)
  * @fifohalfsize: number of bytes that can be written when MCI_TXFIFOHALFEMPTY
  *		  is asserted (likewise for RX)
+ * @sdio: variant supports SDIO
+ * @st_clkdiv: true if using a ST-specific clock divider algorithm
+ * @pwrreg_powerup: power up value for MMCIPOWER register
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -324,28 +533,46 @@ struct variant_data {
 	unsigned int		datalength_bits;
 	unsigned int		fifosize;
 	unsigned int		fifohalfsize;
+	bool			sdio;
+	bool			st_clkdiv;
+	u32			pwrreg_powerup;
 };
 
 static struct variant_data variant_arm = {
 	.fifosize		= 16 * 4,
 	.fifohalfsize		= 8 * 4,
 	.datalength_bits	= 16,
+	.pwrreg_powerup		= MCI_PWR_UP,
 };
 
 static struct variant_data variant_u300 = {
 	.fifosize		= 16 * 4,
 	.fifohalfsize		= 8 * 4,
-	.clkreg_enable		= 1 << 13, /* HWFCEN */
+	.clkreg_enable		= MCI_ST_U300_HWFCEN,
 	.datalength_bits	= 16,
+	.sdio			= true,
+	.pwrreg_powerup		= MCI_PWR_ON,
 };
 
 static struct variant_data variant_ux500 = {
 	.fifosize		= 30 * 4,
 	.fifohalfsize		= 8 * 4,
 	.clkreg			= MCI_CLK_ENABLE,
-	.clkreg_enable		= 1 << 14, /* HWFCEN */
+#if defined(CONFIG_STM32_SD_DMA)
+	/*
+	 * On STM32, do not use HW flow control as recommended
+	 * in the STM32F20x/STM32F21x errata sheet.
+	 */
+	.clkreg_enable		= 0,
+#else
+	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
+#endif
 	.datalength_bits	= 24,
+	.sdio			= true,
+	.st_clkdiv		= true,
+	.pwrreg_powerup		= MCI_PWR_ON,
 };
+
 /*
  * This must be called with host->lock held
  */
@@ -356,9 +583,30 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
 
 	if (desired) {
 		if (desired >= host->mclk) {
-			clk = MCI_CLK_BYPASS;
+			/*
+			 * The ST clock divider does not like the bypass bit,
+			 * even though it's available. Instead the datasheet
+			 * recommends setting the divider to zero.
+			 */
+			if (!variant->st_clkdiv)
+				clk = MCI_CLK_BYPASS;
 			host->cclk = host->mclk;
+		} else if (variant->st_clkdiv) {
+			/*
+			 * DB8500 TRM says f = mclk / (clkdiv + 2)
+			 * => clkdiv = (mclk / f) - 2
+			 * Round the divider up so we don't exceed the max
+			 * frequency
+			 */
+			clk = DIV_ROUND_UP(host->mclk, desired) - 2;
+			if (clk >= 256)
+				clk = 255;
+			host->cclk = host->mclk / (clk + 2);
 		} else {
+			/*
+			 * PL180 TRM says f = mclk / (2 * (clkdiv + 1))
+			 * => clkdiv = mclk / (2 * f) - 1
+			 */
 			clk = DIV_ROUND_UP(host->mclk, 2 * desired) - 1;
 			if (clk >= 256)
 				clk = 255;
@@ -438,9 +686,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
 
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 {
-#ifndef CONFIG_LPC178X_SD_DMA
 	struct variant_data *variant = host->variant;
-#endif /* !CONFIG_LPC178X_SD_DMA */
 	unsigned int datactrl, timeout, irqmask = 0;
 	unsigned long long clks;
 	void __iomem *base;
@@ -462,23 +708,23 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 
 	base = host->base;
 	writel(timeout, base + MMCIDATATIMER);
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 	writel((host->size * data->blocks), base + MMCIDATALENGTH);
 #else
 	writel(host->size, base + MMCIDATALENGTH);
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 
 	blksz_bits = ffs(data->blksz) - 1;
 	BUG_ON(1 << blksz_bits != data->blksz);
 
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 	datactrl = MCI_DPSM_ENABLE | MCI_DPSM_DMAENABLE | blksz_bits << 4;
 	if (data->flags & MMC_DATA_READ) {
 		datactrl |= MCI_DPSM_DIRECTION;
-		lpc178x_drvdat.lastch = DMA_CH_SDCARD_RX;
+		dmac_drvdat.lastch = DMA_CH_SDCARD_RX;
 		mmc_dma_rx_start(host);
 	} else {
-		lpc178x_drvdat.lastch = DMA_CH_SDCARD_TX;
+		dmac_drvdat.lastch = DMA_CH_SDCARD_TX;
 		mmc_dma_tx_start(host);
 	}
 #else
@@ -500,15 +746,20 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 		 */
 		irqmask = MCI_TXFIFOHALFEMPTYMASK;
 	}
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
+
+	/* The ST Micro variants has a special bit to enable SDIO */
+	if (variant->sdio && host->mmc->card)
+		if (mmc_card_sdio(host->mmc->card))
+			datactrl |= MCI_ST_DPSM_SDIOEN;
 
 	writel(datactrl, base + MMCIDATACTRL);
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 	datactrl = readl(base + MMCIMASK0) & ~MCI_DATABLOCKENDMASK;
 	writel(datactrl | MCI_DATAENDMASK, base + MMCIMASK0);
 #else
 	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 
 	mmci_set_mask1(host, irqmask);
 }
@@ -545,7 +796,7 @@ static void
 mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 	      unsigned int status)
 {
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 	if (status & MCI_DATAEND) {
 		host->data_xfered += data->blksz * data->blocks;
 	}
@@ -553,7 +804,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 	if (status & MCI_DATABLOCKEND) {
 		host->data_xfered += data->blksz;
 	}
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 
 	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
 		dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ (status %08x)\n", status);
@@ -583,20 +834,30 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 	}
 
 	if (status & MCI_DATAEND) {
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 		if (data->flags & MMC_DATA_READ) {
-			lpc178x_dma_force_burst(lpc178x_drvdat.lastch,
+#if defined(CONFIG_LPC178X_SD_DMA)
+			lpc178x_dma_force_burst(dmac_drvdat.lastch,
 				DMA_PERID_SDCARD);
-			lpc178x_dma_flush_llist(lpc178x_drvdat.lastch);
+			lpc178x_dma_flush_llist(dmac_drvdat.lastch);
+#else /* CONFIG_STM32_SD_DMA */
+			stm32_dma_ch_disable(STM32F2_DMACH_SDIO);
+#endif
 			dma_unmap_sg(mmc_dev(host->mmc),
 				data->sg, data->sg_len, DMA_FROM_DEVICE);
 		} else {
-			lpc178x_dma_ch_disable(lpc178x_drvdat.lastch);
-			if (lpc178x_drvdat.mapped)
+#if defined(CONFIG_LPC178X_SD_DMA)
+			lpc178x_dma_ch_disable(dmac_drvdat.lastch);
+			if (dmac_drvdat.mapped)
 				dma_unmap_sg(mmc_dev(host->mmc), data->sg,
 					data->sg_len, DMA_TO_DEVICE);
+#else /* CONFIG_STM32_SD_DMA */
+			stm32_dma_ch_disable(STM32F2_DMACH_SDIO);
+			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
+				data->sg_len, DMA_TO_DEVICE);
+#endif
 		}
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 
 		mmci_stop_data(host);
 
@@ -680,7 +941,32 @@ static int mmci_pio_write(struct mmci_host *host, char *buffer, unsigned int rem
 			 variant->fifosize : variant->fifohalfsize;
 		count = min(remain, maxcnt);
 
-		writesl(base + MMCIFIFO, ptr, count >> 2);
+		/*
+		 * The ST Micro variant for SDIO transfer sizes
+		 * less then 8 bytes should have clock H/W flow
+		 * control disabled.
+		 */
+		if (variant->sdio &&
+		    mmc_card_sdio(host->mmc->card)) {
+			if (count < 8)
+				writel(readl(host->base + MMCICLOCK) &
+					~variant->clkreg_enable,
+					host->base + MMCICLOCK);
+			else
+				writel(readl(host->base + MMCICLOCK) |
+					variant->clkreg_enable,
+					host->base + MMCICLOCK);
+		}
+
+		/*
+		 * SDIO especially may want to send something that is
+		 * not divisible by 4 (as opposed to card sectors
+		 * etc), and the FIFO only accept full 32-bit writes.
+		 * So compensate by adding +3 on the count, a single
+		 * byte become a 32bit write, 7 bytes will be two
+		 * 32bit writes etc.
+		 */
+		writesl(base + MMCIFIFO, ptr, (count + 3) >> 2);
 
 		ptr += count;
 		remain -= count;
@@ -802,11 +1088,11 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
 		}
 
 		status &= readl(host->base + MMCIMASK0);
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 		writel((status | MCI_DATABLOCKEND), host->base + MMCICLEAR);
 #else
 		writel(status, host->base + MMCICLEAR);
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 
 		dev_dbg(mmc_dev(host->mmc), "irq0 (data+cmd) %08x\n", status);
 
@@ -857,36 +1143,42 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct mmci_host *host = mmc_priv(mmc);
+	struct variant_data *variant = host->variant;
 	u32 pwr = 0;
 	unsigned long flags;
+	int ret;
+
+	if (host->plat->ios_handler &&
+		host->plat->ios_handler(mmc_dev(mmc), ios))
+			dev_err(mmc_dev(mmc), "platform ios_handler failed\n");
 
 	switch (ios->power_mode) {
 	case MMC_POWER_OFF:
-		if(host->vcc &&
-		   regulator_is_enabled(host->vcc))
-			regulator_disable(host->vcc);
+		if (host->vcc)
+			ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);
 		break;
 	case MMC_POWER_UP:
-#ifdef CONFIG_REGULATOR
-		if (host->vcc)
-			/* This implicitly enables the regulator */
-			mmc_regulator_set_ocr(host->vcc, ios->vdd);
-#endif
-		/*
-		 * The translate_vdd function is not used if you have
-		 * an external regulator, or your design is really weird.
-		 * Using it would mean sending in power control BOTH using
-		 * a regulator AND the 4 MMCIPWR bits. If we don't have
-		 * a regulator, we might have some other platform specific
-		 * power control behind this translate function.
-		 */
-		if (!host->vcc && host->plat->translate_vdd)
-			pwr |= host->plat->translate_vdd(mmc_dev(mmc), ios->vdd);
-		/* The ST version does not have this, fall through to POWER_ON */
-		if (host->hw_designer != AMBA_VENDOR_ST) {
-			pwr |= MCI_PWR_UP;
-			break;
+		if (host->vcc) {
+			ret = mmc_regulator_set_ocr(mmc, host->vcc, ios->vdd);
+			if (ret) {
+				dev_err(mmc_dev(mmc), "unable to set OCR\n");
+				/*
+				 * The .set_ios() function in the mmc_host_ops
+				 * struct return void, and failing to set the
+				 * power should be rare so we print an error
+				 * and return here.
+				 */
+				return;
+			}
 		}
+		/*
+		 * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
+		 * and instead uses MCI_PWR_ON so apply whatever value is
+		 * configured in the variant data.
+		 */
+		pwr |= variant->pwrreg_powerup;
+
+		break;
 	case MMC_POWER_ON:
 		pwr |= MCI_PWR_ON;
 		break;
@@ -1078,18 +1370,37 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
 		mmc->ocr_avail = plat->ocr_mask;
 	mmc->caps = plat->capabilities;
 
+#ifdef CONFIG_STM32_SD_DMA
+	/*
+	 * Always use a single bounce buffer on STM32. On STM32F2 this
+	 * could be set to 2, because this MCU supports Double Buffer Mode,
+	 * but it would be harder to implement than single buffer DMA.
+	 */
+	mmc->max_hw_segs = 1;
+#else
 	/*
 	 * We can do SGIO
 	 */
 	mmc->max_hw_segs = 16;
+#endif /* CONFIG_STM32_SD_DMA */
+
 	mmc->max_phys_segs = NR_SG;
 
+#ifdef CONFIG_STM32_SD_DMA
+	/*
+	 * The Number Of Data register on STM32 is 16-bit, but note that it
+	 * denotes the number of 32-bit words in a data transfer. This is why
+	 * we multiply the maximum value of this register by 4.
+	 */
+	mmc->max_req_size = ((1 << 16) - 1) * 4;
+#else
 	/*
 	 * Since only a certain number of bits are valid in the data length
 	 * register, we must ensure that we don't exceed 2^num-1 bytes in a
 	 * single request.
 	 */
 	mmc->max_req_size = (1 << variant->datalength_bits) - 1;
+#endif /* CONFIG_STM32_SD_DMA */
 
 #ifdef CONFIG_LPC178X_SD_DMA
 	/*
@@ -1124,14 +1435,14 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
 	 */
 	mmc->max_blk_count = mmc->max_req_size;
 
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 	/*
 	 * Setup DMA for the interface
 	 */
-	lpc178x_drvdat.dev = &dev->dev;
+	dmac_drvdat.dev = &dev->dev;
 	if (mmc_dma_setup(plat))
 		goto err_dma_setup;
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 
 	spin_lock_init(&host->lock);
 
@@ -1211,10 +1522,10 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
 	if (host->gpio_cd != -ENOSYS)
 		gpio_free(host->gpio_cd);
  err_gpio_cd:
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 	mmc_dma_dealloc();
  err_dma_setup:
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 	iounmap(host->base);
  clk_disable:
 	clk_disable(host->clk);
@@ -1258,16 +1569,16 @@ static int __devexit mmci_remove(struct amba_device *dev)
 		if (host->gpio_cd != -ENOSYS)
 			gpio_free(host->gpio_cd);
 
-#ifdef CONFIG_LPC178X_SD_DMA
+#if defined(CONFIG_LPC178X_SD_DMA) || defined(CONFIG_STM32_SD_DMA)
 		mmc_dma_dealloc();
-#endif /* CONFIG_LPC178X_SD_DMA */
+#endif /* CONFIG_LPC178X_SD_DMA || CONFIG_STM32_SD_DMA */
 
 		iounmap(host->base);
 		clk_disable(host->clk);
 		clk_put(host->clk);
 
-		if (regulator_is_enabled(host->vcc))
-			regulator_disable(host->vcc);
+		if (host->vcc)
+			mmc_regulator_set_ocr(mmc, host->vcc, 0);
 		regulator_put(host->vcc);
 
 		mmc_free_host(mmc);

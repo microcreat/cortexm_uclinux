@@ -191,7 +191,7 @@ config MMU
 
 config MPU
 	bool "Enable the memory protection unit (EXPERIMENTAL)"
-	depends on !MMU
+	depends on !MMU && !MACH_KINETIS
 	default n
 	help
 	  Use the processor MPU to protect applications from accessing
@@ -774,15 +774,17 @@ config ARCH_A2F
 	bool "Actel A2F (SmartFusion) SoC"
 	depends on !MMU
 	select ARM_CORTEXM3
+	select ARCH_WANT_OPTIONAL_GPIOLIB
 	help
 	  This enables support for the Actel A2F (SmartFusion) SoC
 
-config ARCH_STM32
-	bool "STMicro STM32 SoC"
+config ARCH_M2S
+	bool "Actel M2S (SmartFusion2) eSoC"
 	depends on !MMU
 	select ARM_CORTEXM3
+	select ARCH_WANT_OPTIONAL_GPIOLIB
 	help
-	  This enables support for the STMicro STM32 SoC
+	  This enables support for the Actel M2S (SmartFusion2) eSoC
 
 config ARCH_LPC178X
 	bool "NXP LPC178x/7x SoC"
@@ -797,6 +799,7 @@ config ARCH_LPC18XX
 	bool "NXP LPC18xx/43xx MCU"
 	depends on !MMU
 	select ARM_CORTEXM3
+	select ARM_AMBA
 	help
 	  This enables support for the NXP LPC18xx/43xx MCUs
 
@@ -804,7 +807,7 @@ config ARCH_KINETIS
 	bool "Freescale Kinetis MCU"
 	depends on !MMU
 	select ARM_CORTEXM3
-	select GENERIC_GPIO
+	select ARCH_WANT_OPTIONAL_GPIOLIB
 	help
 	  This enables support for the Freescale Kinetis MCUs
 
@@ -922,7 +925,7 @@ source "arch/arm/mach-mps/Kconfig"
 
 source "arch/arm/mach-a2f/Kconfig"
 
-source "arch/arm/mach-stm32/Kconfig"
+source "arch/arm/mach-m2s/Kconfig"
 
 source "arch/arm/mach-lpc178x/Kconfig"
 

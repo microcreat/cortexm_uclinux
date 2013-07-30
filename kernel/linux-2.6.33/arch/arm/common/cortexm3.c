@@ -81,7 +81,7 @@ void cortex_m3_reboot(void)
 			 | CM3_AIRCR_SYSRESET;
 }
 
-#if defined(CONFIG_ARCH_KINETIS) || defined(CONFIG_ARCH_STM32) || \
+#if defined(CONFIG_ARCH_KINETIS) || \
     defined(CONFIG_ARCH_LPC178X) || defined(CONFIG_ARCH_LPC18XX)
 /*
  * The SysTick clocksource is not used on other Cortex-M3 targets,
