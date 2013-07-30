@@ -9,66 +9,66 @@
 #
 # Normal rules
 #
-.*
-*.o
-*.o.*
-*.a
-*.s
-*.ko
-*.so
-*.so.dbg
-*.mod.c
-*.i
-*.lst
-*.symtypes
-*.order
-modules.builtin
-*.elf
-*.bin
-*.gz
-*.bz2
-*.lzma
-*.patch
-*.gcno
+#.*
+#*.o
+#*.o.*
+#*.a
+#*.s
+#*.ko
+#*.so
+#*.so.dbg
+#*.mod.c
+#*.i
+#*.lst
+#*.symtypes
+#*.order
+#modules.builtin
+#*.elf
+#*.bin
+#*.gz
+#*.bz2
+#*.lzma
+#*.patch
+#*.gcno
 
 #
 # Top-level generic files
 #
-tags
-TAGS
-vmlinux
-vmlinuz
-System.map
-Module.markers
-Module.symvers
-/initramfs-list-min
-!.gitignore
-!.mailmap
+#tags
+#TAGS
+#vmlinux
+#vmlinuz
+#System.map
+#Module.markers
+#Module.symvers
+#/initramfs-list-min
+#!.gitignore
+#!.mailmap
 
 #
 # Generated include files
 #
-include/config
-include/linux/version.h
-include/generated
+#include/config
+#include/linux/version.h
+#include/generated
 
 # stgit generated dirs
-patches-*
+#patches-*
 
 # quilt's files
-patches
-series
+#patches
+#series
 
 # cscope files
-cscope.*
-ncscope.*
+#cscope.*
+#ncscope.*
 
 # gnu global files
-GPATH
-GRTAGS
-GSYMS
-GTAGS
+#GPATH
+#GRTAGS
+#GSYMS
+#GTAGS
 
-*.orig
-*~
-\#*#
+#*.orig
+#*~
+#\#*#
