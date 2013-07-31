@@ -11,8 +11,8 @@ UBOOT_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2011.03/bin
 KERNEL_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 ROOTFS_TOOL_DIR := $(root_dir)/$(toolchain_dir)/arm-2010q1-uclinux/bin
 
-#uboot_version := u-boot-2011.06
-uboot_version := u-boot-2010.03
+uboot_version := u-boot-2011.06
+#uboot_version := u-boot-2010.03
 
 filesystem_dir := filesystem
 busybox_version := busybox-1.17.0
@@ -106,8 +106,9 @@ kernel:
 	cp -af $(filesystem_dir)/rootfs/initramfs-list-min $(root_dir)/kernel/linux-2.6.33/
 	sed -i "s:busybox_dir:${busybox_dir}:" $(root_dir)/kernel/linux-2.6.33/initramfs-list-min
 	sudo cp $(root_dir)/uboot/$(uboot_version)/tools/mkimage /bin/
-	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) ea-lpc1788_defconfig
-	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(CROSS_COMPILE) ea-lpc1788_initramfs_defconfig
+	#make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) ea-lpc1788_defconfig
+	#make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) ea-lpc1788_initramfs_defconfig
+	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) mic-lpc1788_defconfig
 	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) uImage
 	sudo rm -rf /bin/mkimage
 	cp -af $(root_dir)/kernel/linux-2.6.33/arch/arm/boot/$(kernel_target) $(target_out)
