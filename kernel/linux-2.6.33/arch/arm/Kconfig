@@ -923,15 +923,11 @@ source "arch/arm/mach-w90x900/Kconfig"
 
 source "arch/arm/mach-mps/Kconfig"
 
-source "arch/arm/mach-a2f/Kconfig"
-
 source "arch/arm/mach-m2s/Kconfig"
 
 source "arch/arm/mach-lpc178x/Kconfig"
 
 source "arch/arm/mach-lpc18xx/Kconfig"
-
-source "arch/arm/mach-kinetis/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN

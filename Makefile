@@ -17,6 +17,9 @@ uboot_version := u-boot-2011.06
 filesystem_dir := filesystem
 busybox_version := busybox-1.17.0
 busybox_dir := $(root_dir)/$(filesystem_dir)/$(busybox_version)
+rootfs_dir := $(root_dir)/$(filesystem_dir)/rootfs
+
+$(shell export $(busybox_dir)) 
 
 target_out := $(root_dir)/out
 kernel_target := uImage
@@ -94,8 +97,8 @@ uboot_clean:
 
 rootfs:
 	make -C $(busybox_dir) ARCH=arm CROSS_COMPILE=$(ROOTFS_CROSS_COMPILE) CFLAGS=$(ROOTFS_CFLAGS) distclean
-	#cp $(busybox_dir)/uclinux_config $(busybox_dir)/.config
-	cp $(busybox_dir)/uclinux_config_bak $(busybox_dir)/.config
+	cp $(busybox_dir)/uclinux_config $(busybox_dir)/.config
+	#cp $(busybox_dir)/uclinux_config_bak $(busybox_dir)/.config
 	make -C $(busybox_dir) ARCH=arm CROSS_COMPILE=$(ROOTFS_CROSS_COMPILE) CFLAGS=$(ROOTFS_CFLAGS) SKIP_STRIP=y
 	make -C $(busybox_dir) ARCH=arm CROSS_COMPILE=$(ROOTFS_CROSS_COMPILE) CFLAGS=$(ROOTFS_CFLAGS) install
 
@@ -106,6 +109,7 @@ kernel:
 	cp -af $(filesystem_dir)/rootfs/initramfs-list-min $(root_dir)/kernel/linux-2.6.33/
 	sed -i "s:busybox_dir:${busybox_dir}:" $(root_dir)/kernel/linux-2.6.33/initramfs-list-min
 	sudo cp $(root_dir)/uboot/$(uboot_version)/tools/mkimage /bin/
+	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) distclean	
 	#make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) ea-lpc1788_defconfig
 	#make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) ea-lpc1788_initramfs_defconfig
 	make -C $(root_dir)/kernel/linux-2.6.33/ CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) mic-lpc1788_defconfig

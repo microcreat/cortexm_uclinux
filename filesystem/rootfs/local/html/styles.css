@@ -1,0 +1,64 @@
+body {
+	background-color:#FFFFFF;
+}
+
+body,td,th {
+
+	font-family: "MS Sans Serif";
+	font-size: 10px;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	color: #333333;
+}
+
+a:link {
+	color: #0066CC;
+}
+
+a:visited {
+	color: #0066CC;
+}
+a:hover {
+	color: #ff6600;
+}
+a:active {
+	color: #ff9933;
+}
+a.razdel {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 19px;
+	color: #E7E7E7;
+}
+a.razdel:visited {
+	color: #E7E7E7;
+}
+
+a.razdel:hover {
+	color: #FFFFFF;
+}
+
+a.razdel:active {
+	color: #E7E7E7;
+}
+h1 {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 25px;
+	color: #333333;
+	font-weight: bold;
+}
+
+hh1 {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 15px;
+	color: #333333;
+	font-weight: bold;
+}
+
+h2 {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 17px;
+	color: #333333;
+	font-weight: bold;
+}
